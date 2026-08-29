@@ -19,28 +19,29 @@ def ocr():
         return jsonify({"error": "No file uploaded"}), 400
 
     uploaded_file = request.files["file"]
+    
+    # Read bytes and check length
     file_bytes = uploaded_file.read()
-    filename = uploaded_file.filename.lower()
+    if not file_bytes:
+        return jsonify({"error": "Uploaded file is empty"}), 400
 
+    filename = uploaded_file.filename.lower()
     extracted_text = ""
 
     try:
         if filename.endswith(".pdf"):
             images = convert_from_bytes(file_bytes, dpi=300)
             for i, image in enumerate(images):
-                extracted_text += (
-                    f"--- Page {i+1} ---\n"
-                    + pytesseract.image_to_string(image)
-                    + "\n\n"
-                )
+                extracted_text += f"--- Page {i+1} ---\n" + pytesseract.image_to_string(image) + "\n\n"
         else:
-            image = Image.open(io.BytesIO(file_bytes))
+            # Wrap bytes in BytesIO stream
+            image_stream = io.BytesIO(file_bytes)
+            image = Image.open(image_stream)
             extracted_text = pytesseract.image_to_string(image)
 
         return jsonify({"status": "success", "text": extracted_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
