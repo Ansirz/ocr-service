@@ -7,11 +7,9 @@ from pdf2image import convert_from_bytes
 
 app = Flask(__name__)
 
-
 @app.route("/", methods=["GET"])
 def health():
     return jsonify({"status": "running"}), 200
-
 
 @app.route("/ocr", methods=["POST"])
 def ocr():
@@ -20,10 +18,12 @@ def ocr():
 
     uploaded_file = request.files["file"]
     
-    # Read bytes and check length
+    # Ensure stream position is at the beginning and read bytes
+    uploaded_file.seek(0)
     file_bytes = uploaded_file.read()
-    if not file_bytes:
-        return jsonify({"error": "Uploaded file is empty"}), 400
+    
+    if not file_bytes or len(file_bytes) == 0:
+        return jsonify({"error": "Received empty file stream"}), 400
 
     filename = uploaded_file.filename.lower()
     extracted_text = ""
@@ -34,9 +34,8 @@ def ocr():
             for i, image in enumerate(images):
                 extracted_text += f"--- Page {i+1} ---\n" + pytesseract.image_to_string(image) + "\n\n"
         else:
-            # Wrap bytes in BytesIO stream
-            image_stream = io.BytesIO(file_bytes)
-            image = Image.open(image_stream)
+            # Force conversion to RGB mode to support transparency/PNGs cleanly
+            image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
             extracted_text = pytesseract.image_to_string(image)
 
         return jsonify({"status": "success", "text": extracted_text})
